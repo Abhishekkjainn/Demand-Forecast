@@ -104,8 +104,8 @@ def forecast():
         plot_path = create_bokeh_plots(df, item_id, future_months, predicted_demand)
 
         response = {
-            "future_months": future_months.tolist() if isinstance(future_months, list) else future_months,
-            "predicted_demand": predicted_demand.tolist() if isinstance(predicted_demand, list) else predicted_demand,
+            "future_months": future_months if isinstance(future_months, list) else future_months.tolist(),
+            "predicted_demand": predicted_demand if isinstance(predicted_demand, list) else predicted_demand.tolist(),
             "alerts": alerts,
             "plot_url": f"/plot/{item_id}"
         }
@@ -116,6 +116,7 @@ def forecast():
     except Exception as e:
         app.logger.error(f"Error during forecasting: {e}")
         return jsonify({"error": "An error occurred during forecasting. Please try again."}), 500
+
 
 # Plot route to serve the forecast plot
 @app.route('/plot/<item_id>')
