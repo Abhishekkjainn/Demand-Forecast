@@ -118,6 +118,7 @@ def ensemble_forecast(sarima_forecast, rnn_forecast):
     rnn_weight = 0.3
     return sarima_weight * np.array(sarima_forecast) + rnn_weight * np.array(rnn_forecast)
 
+
 def predict_demand(df, item_id):
     item_data = df[df['item_id'] == item_id].copy()
     item_data.sort_values('transaction_date', inplace=True)
@@ -125,20 +126,36 @@ def predict_demand(df, item_id):
     monthly_demand = item_data.groupby('year_month')['quantity'].sum().reset_index()
     monthly_demand.set_index('year_month', inplace=True)
     monthly_demand = preprocess_data(monthly_demand.asfreq('M', fill_value=0))
+
+    # Check if the series is stationary and apply seasonal differencing if needed
     if not is_stationary(monthly_demand['quantity']):
         monthly_demand['quantity'] = seasonal_differencing(monthly_demand['quantity'], period=12)
+
+    # Fit SARIMA and get forecast
     forecast_sarima, _ = fit_sarima_model(monthly_demand['quantity'])
+
+    # Run RNN forecast
     forecast_rnn = run_rnn_forecast(monthly_demand['quantity'])
+
+    # Calculate MAPE (Mean Absolute Percentage Error) for both models if enough data is available
     if len(monthly_demand['quantity']) > FORECAST_MONTHS:
         actual_values = monthly_demand['quantity'][-FORECAST_MONTHS:].values
         sarima_mape = mean_absolute_percentage_error(actual_values, forecast_sarima)
         rnn_mape = mean_absolute_percentage_error(actual_values, forecast_rnn)
+
+        # Print the MAPE for both models
         print(f"SARIMA MAPE: {sarima_mape:.2f}%")
         print(f"RNN MAPE: {rnn_mape:.2f}%")
+
+    # Combine the SARIMA and RNN forecasts using an ensemble method
     forecast = ensemble_forecast(forecast_sarima, forecast_rnn)
+
+    # Generate future dates for the forecast
     future_dates = [monthly_demand.index[-1].to_timestamp() + pd.DateOffset(months=i) for i in
                     range(1, FORECAST_MONTHS + 1)]
+
     return future_dates, forecast
+
 
 def check_stock_and_alert(df, item_id, predicted_demand, future_months):
     item_data = df[df['item_id'] == item_id]
